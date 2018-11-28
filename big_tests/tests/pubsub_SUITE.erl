@@ -121,7 +121,8 @@ all() -> [
           {group, collection},
           {group, collection_config},
           {group, debug_calls},
-          {group, pubsub_item_publisher_option}
+          {group, pubsub_item_publisher_option},
+          {group, last_item_cache_mnesia}
          ].
 
 groups() ->
@@ -211,6 +212,12 @@ groups() ->
            get_item_with_publisher_option_test,
            receive_item_notification_with_publisher_option_test
           ]
+         },
+         {last_item_cache_mnesia, [parallel],
+          [
+           send_last_published_item_test,
+           purge_all_items_test
+          ]
          }
         ],
     ct_helper:repeat_all_until_all_ok(G).
@@ -236,10 +243,21 @@ init_per_group(pubsub_item_publisher_option, Config) ->
     dynamic_modules:restart(domain(), mod_pubsub, Args0),
     Config0;
 
+init_per_group(last_item_cache_mnesia, Config) ->
+    Config0 = dynamic_modules:save_modules(domain(), Config),
+    Args = proplists:get_value(mod_pubsub, required_modules()),
+    Args0 = [{last_item_cache, mnesia} | Args],
+    dynamic_modules:restart(domain(), mod_pubsub, Args0),
+    Config0;
+
 init_per_group(_GroupName, Config) ->
     Config.
 
 end_per_group(pubsub_item_publisher_option, Config) ->
+    dynamic_modules:restore_modules(domain(), Config);
+
+end_per_group(last_item_cache_mnesia, Config) ->
+    rpc(mim(), mod_pubsub_cache_mnesia, stop, []),
     dynamic_modules:restore_modules(domain(), Config);
 
 end_per_group(_GroupName, _Config) ->

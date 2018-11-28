@@ -122,7 +122,8 @@ all() -> [
           {group, collection_config},
           {group, debug_calls},
           {group, pubsub_item_publisher_option},
-          {group, last_item_cache_mnesia}
+          {group, last_item_cache_mnesia},
+          {group, last_item_cache_rdbms}
          ].
 
 groups() ->
@@ -218,6 +219,12 @@ groups() ->
            send_last_published_item_test,
            purge_all_items_test
           ]
+         },
+         {last_item_cache_rdbms, [parallel],
+          [
+           send_last_published_item_test,
+           purge_all_items_test
+          ]
          }
         ],
     ct_helper:repeat_all_until_all_ok(G).
@@ -250,6 +257,18 @@ init_per_group(last_item_cache_mnesia, Config) ->
     dynamic_modules:restart(domain(), mod_pubsub, Args0),
     Config0;
 
+init_per_group(last_item_cache_rdbms, Config) ->
+    case mongoose_helper:is_rdbms_enabled(domain()) of
+        true ->
+            Config0 = dynamic_modules:save_modules(domain(), Config),
+            Args = proplists:get_value(mod_pubsub, required_modules()),
+            Args0 = [{last_item_cache, rdbms} | Args],
+            dynamic_modules:restart(domain(), mod_pubsub, Args0),
+            Config0;
+        false ->
+            {skip, require_rdbms}
+    end;
+
 init_per_group(_GroupName, Config) ->
     Config.
 
@@ -258,6 +277,9 @@ end_per_group(pubsub_item_publisher_option, Config) ->
 
 end_per_group(last_item_cache_mnesia, Config) ->
     rpc(mim(), mod_pubsub_cache_mnesia, stop, []),
+    dynamic_modules:restore_modules(domain(), Config);
+
+end_per_group(last_item_cache_rdbms, Config) ->
     dynamic_modules:restore_modules(domain(), Config);
 
 end_per_group(_GroupName, _Config) ->
